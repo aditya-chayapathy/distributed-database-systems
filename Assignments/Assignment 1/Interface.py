@@ -14,13 +14,10 @@ def getopenconnection(user='postgres', password='1234', dbname='dds_assgn1'):
 
 def check_if_table_exists(table_name, openconnection):
     cur = openconnection.cursor()
-
     cur.execute('select current_database()')
     db_name = cur.fetchall()[0][0]
-
     cur.execute('select count(*) from information_schema.tables where table_name=\'' + table_name + '\' and table_catalog=\'' + db_name + '\'')
     count = cur.fetchall()[0][0]
-
     cur.close()
 
     if count == 1:
@@ -31,12 +28,10 @@ def check_if_table_exists(table_name, openconnection):
 
 def create_table(table_name, openconnection):
     create_command = ""
-    if table_name == 'metadata':
-        create_command = 'create table metadata (current_round_robin_fragment int, current_range_fragment int)'
-    elif table_name == 'ratings':
-        create_command = 'create table ratings (userid int, movieid int, rating real)'
+    if table_name == 'ratings':
+        create_command = 'create table if not exists ratings (userid int, movieid int, rating real)'
     elif 'ratings' in table_name:
-        create_command = 'create table ' + table_name + ' (userid int, movieid int, rating real)'
+        create_command = 'create table if not exists ' + table_name + ' (userid int, movieid int, rating real)'
     else:
         print "UNKNOWN TABLE. ABORTING !!!"
         exit(2)
@@ -49,17 +44,44 @@ def create_table(table_name, openconnection):
 
 def insert_ratings_record_to_table(userid, movieid, ratings, table_name, openconnection):
     cur = openconnection.cursor()
-    cur.execute("insert into " + table_name + " values (" + userid + "," + movieid + "," + ratings + ")")
+    cur.execute("insert into " + table_name + " values (" + str(userid) + "," + str(movieid) + "," + str(ratings) + ")")
     openconnection.commit()
     cur.close()
+
+
+def create_range_partitions(numberofpartitions, openconnection):
+    for i in range(numberofpartitions):
+        create_command = 'create table if not exists range_part' + str(i) + ' (userid int, movieid int, rating real)'
+        cur = openconnection.cursor()
+        cur.execute(create_command)
+        openconnection.commit()
+        cur.close()
+
+
+def get_partition_number_for_rating(interval_range, rating):
+    partition = 0
+    start_range = 0
+    end_range = interval_range
+    while True:
+        if partition == 0:
+            if rating >= start_range and rating <= end_range:
+                return partition
+            else:
+                start_range = end_range
+                end_range += interval_range
+                partition += 1
+        else:
+            if rating > start_range and rating <= end_range:
+                return partition
+            else:
+                start_range = end_range
+                end_range += interval_range
+                partition += 1
 
 
 def loadratings(ratingstablename, ratingsfilepath, openconnection):
     if not check_if_table_exists(ratingstablename, openconnection):
         create_table(ratingstablename, openconnection)
-
-    if not check_if_table_exists('metadata', openconnection):
-        create_table('metadata', openconnection)
 
     with open(ratingsfilepath, 'r') as input_file:
         file_data = input_file.read()
@@ -69,7 +91,21 @@ def loadratings(ratingstablename, ratingsfilepath, openconnection):
 
 
 def rangepartition(ratingstablename, numberofpartitions, openconnection):
-    pass
+    if not check_if_table_exists(ratingstablename, openconnection):
+        create_table(ratingstablename, openconnection)
+
+    interval_range = 5 / float(numberofpartitions)
+    create_range_partitions(numberofpartitions, openconnection)
+
+    cur = openconnection.cursor()
+    cur.execute('select * from ratings')
+    data = cur.fetchall()
+    cur.close()
+    for row in data:
+        userid, movieid, rating = row
+        partition_number = get_partition_number_for_rating(interval_range, rating)
+        table_name = "range_part" + str(partition_number)
+        insert_ratings_record_to_table(userid, movieid, rating, table_name, openconnection)
 
 
 def roundrobinpartition(ratingstablename, numberofpartitions, openconnection):

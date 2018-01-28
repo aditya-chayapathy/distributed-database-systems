@@ -174,7 +174,25 @@ def rangeinsert(ratingstablename, userid, itemid, rating, openconnection):
 
 
 def deletepartitionsandexit(openconnection):
-    pass
+    cur = openconnection.cursor()
+    cur.execute('select current_database()')
+    db_name = cur.fetchall()[0][0]
+    cur.execute('drop table ratings')
+
+    cur.execute('select table_name from information_schema.tables where table_name like \'%range_part%\' and table_catalog=\'' + db_name + '\'')
+    range_partitions = cur.fetchall()
+    for table in range_partitions:
+        table_name = table[0]
+        cur.execute('drop table ' + table_name)
+
+    cur.execute('select table_name from information_schema.tables where table_name like \'%rrobin_part%\' and table_catalog=\'' + db_name + '\'')
+    round_robin_partitions = cur.fetchall()
+    for table in round_robin_partitions:
+        table_name = table[0]
+        cur.execute('drop table ' + table_name)
+
+    openconnection.commit()
+    cur.close()
 
 
 def create_db(dbname):

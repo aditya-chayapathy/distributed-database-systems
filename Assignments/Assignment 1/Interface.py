@@ -122,7 +122,7 @@ def roundrobinpartition(ratingstablename, numberofpartitions, openconnection):
     create_partitions(numberofpartitions, "round robin", openconnection)
 
     cur = openconnection.cursor()
-    cur.execute('select * from ratings')
+    cur.execute('select * from ' + ratingstablename)
     data = cur.fetchall()
     cur.close()
     partition_number = 0
@@ -136,7 +136,28 @@ def roundrobinpartition(ratingstablename, numberofpartitions, openconnection):
 
 
 def roundrobininsert(ratingstablename, userid, itemid, rating, openconnection):
-    pass
+    cur = openconnection.cursor()
+    cur.execute('select current_database()')
+    db_name = cur.fetchall()[0][0]
+    cur.execute('select count(*) from information_schema.tables where table_name like \'%robin%\' and table_catalog=\'' + db_name + '\'')
+    partitions_count = cur.fetchall()[0][0]
+
+    partition_records_dict = {}
+    for i in range(partitions_count):
+        cur.execute('select count(*) from rrobin_part' + str(i))
+        count = cur.fetchall()[0][0]
+        partition_records_dict['rrobin_part' + str(i)] = count
+    cur.close()
+
+    partition_to_insert = 0
+    if len(set(partition_records_dict.values())) != 1:
+        for i in range(1, partitions_count):
+            if partition_records_dict['rrobin_part' + str(i)] == partition_records_dict['rrobin_part' + str(i - 1)] + 1:
+                partition_to_insert = i
+                break
+
+    table_name = "rrobin_part" + str(partition_to_insert)
+    insert_ratings_record_to_table(userid, itemid, rating, table_name, openconnection)
 
 
 def rangeinsert(ratingstablename, userid, itemid, rating, openconnection):

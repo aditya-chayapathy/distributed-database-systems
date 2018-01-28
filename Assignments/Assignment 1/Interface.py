@@ -49,9 +49,16 @@ def insert_ratings_record_to_table(userid, movieid, ratings, table_name, opencon
     cur.close()
 
 
-def create_range_partitions(numberofpartitions, openconnection):
+def create_partitions(numberofpartitions, type, openconnection):
     for i in range(numberofpartitions):
-        create_command = 'create table if not exists range_part' + str(i) + ' (userid int, movieid int, rating real)'
+        create_command = ""
+        if type == "range":
+            create_command = 'create table if not exists range_part' + str(i) + ' (userid int, movieid int, rating real)'
+        elif type == "round robin":
+            create_command = 'create table if not exists rrobin_part' + str(i) + ' (userid int, movieid int, rating real)'
+        else:
+            print "INCORRECT TYPE. ABORTING !!!"
+            exit(2)
         cur = openconnection.cursor()
         cur.execute(create_command)
         openconnection.commit()
@@ -95,7 +102,7 @@ def rangepartition(ratingstablename, numberofpartitions, openconnection):
         create_table(ratingstablename, openconnection)
 
     interval_range = 5 / float(numberofpartitions)
-    create_range_partitions(numberofpartitions, openconnection)
+    create_partitions(numberofpartitions, "range", openconnection)
 
     cur = openconnection.cursor()
     cur.execute('select * from ratings')
@@ -109,7 +116,23 @@ def rangepartition(ratingstablename, numberofpartitions, openconnection):
 
 
 def roundrobinpartition(ratingstablename, numberofpartitions, openconnection):
-    pass
+    if not check_if_table_exists(ratingstablename, openconnection):
+        create_table(ratingstablename, openconnection)
+
+    create_partitions(numberofpartitions, "round robin", openconnection)
+
+    cur = openconnection.cursor()
+    cur.execute('select * from ratings')
+    data = cur.fetchall()
+    cur.close()
+    partition_number = 0
+    for row in data:
+        userid, movieid, rating = row
+        table_name = "rrobin_part" + str(partition_number)
+        insert_ratings_record_to_table(userid, movieid, rating, table_name, openconnection)
+        partition_number += 1
+        if partition_number == numberofpartitions:
+            partition_number = 0
 
 
 def roundrobininsert(ratingstablename, userid, itemid, rating, openconnection):

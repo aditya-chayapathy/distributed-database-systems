@@ -72,7 +72,7 @@ def get_partition_number_for_rating(interval_range, rating):
     while True:
         if partition == 0:
             if rating >= start_range and rating <= end_range:
-                return partition
+                return 0
             else:
                 start_range = end_range
                 end_range += interval_range
@@ -139,7 +139,7 @@ def roundrobininsert(ratingstablename, userid, itemid, rating, openconnection):
     cur = openconnection.cursor()
     cur.execute('select current_database()')
     db_name = cur.fetchall()[0][0]
-    cur.execute('select count(*) from information_schema.tables where table_name like \'%robin%\' and table_catalog=\'' + db_name + '\'')
+    cur.execute('select count(*) from information_schema.tables where table_name like \'%robin_part%\' and table_catalog=\'' + db_name + '\'')
     partitions_count = cur.fetchall()[0][0]
 
     partition_records_dict = {}
@@ -161,7 +161,16 @@ def roundrobininsert(ratingstablename, userid, itemid, rating, openconnection):
 
 
 def rangeinsert(ratingstablename, userid, itemid, rating, openconnection):
-    pass
+    cur = openconnection.cursor()
+    cur.execute('select current_database()')
+    db_name = cur.fetchall()[0][0]
+    cur.execute('select count(*) from information_schema.tables where table_name like \'%range_part%\' and table_catalog=\'' + db_name + '\'')
+    partitions_count = cur.fetchall()[0][0]
+
+    interval_range = 5 / float(partitions_count)
+    partition_number = get_partition_number_for_rating(interval_range, rating)
+    table_name = "range_part" + str(partition_number)
+    insert_ratings_record_to_table(userid, itemid, rating, table_name, openconnection)
 
 
 def deletepartitionsandexit(openconnection):

@@ -217,17 +217,3 @@ def create_db(dbname):
     # Clean up
     cur.close()
     con.close()
-
-
-if __name__ == "__main__":
-    con = getopenconnection(dbname='postgres')
-    loadratings("ratings", "test_data.dat", con)
-    roundrobinpartition("ratings", 5, con)
-    roundrobininsert("ratings", 1, 2, 3, con)
-    roundrobininsert("ratings", 2, 2, 13, con)
-    roundrobininsert("ratings", 3, 9, 3, con)
-    roundrobininsert("ratings", 4, 2, 13, con)
-    roundrobininsert("ratings", 5, 7, 33, con)
-    roundrobininsert("ratings", 6, 2, 3, con)
-    roundrobininsert("ratings", 6, 2, 3, con)
-    deletepartitionsandexit(con)

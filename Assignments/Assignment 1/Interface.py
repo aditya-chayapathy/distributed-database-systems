@@ -152,7 +152,7 @@ def roundrobininsert(ratingstablename, userid, itemid, rating, openconnection):
     partition_to_insert = 0
     if len(set(partition_records_dict.values())) != 1:
         for i in range(1, partitions_count):
-            if partition_records_dict['rrobin_part' + str(i)] == partition_records_dict['rrobin_part' + str(i - 1)] + 1:
+            if partition_records_dict['rrobin_part' + str(i)] == partition_records_dict['rrobin_part' + str(i - 1)] - 1:
                 partition_to_insert = i
                 break
 
@@ -217,3 +217,17 @@ def create_db(dbname):
     # Clean up
     cur.close()
     con.close()
+
+
+if __name__ == "__main__":
+    con = getopenconnection(dbname='postgres')
+    loadratings("ratings", "test_data.dat", con)
+    roundrobinpartition("ratings", 5, con)
+    roundrobininsert("ratings", 1, 2, 3, con)
+    roundrobininsert("ratings", 2, 2, 13, con)
+    roundrobininsert("ratings", 3, 9, 3, con)
+    roundrobininsert("ratings", 4, 2, 13, con)
+    roundrobininsert("ratings", 5, 7, 33, con)
+    roundrobininsert("ratings", 6, 2, 3, con)
+    roundrobininsert("ratings", 6, 2, 3, con)
+    deletepartitionsandexit(con)

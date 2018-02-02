@@ -105,7 +105,7 @@ def rangepartition(ratingstablename, numberofpartitions, openconnection):
     create_partitions(numberofpartitions, "range", openconnection)
 
     cur = openconnection.cursor()
-    cur.execute('select * from ratings')
+    cur.execute('select * from ' + ratingstablename)
     data = cur.fetchall()
     cur.close()
     for row in data:
@@ -139,7 +139,7 @@ def roundrobininsert(ratingstablename, userid, itemid, rating, openconnection):
     cur = openconnection.cursor()
     cur.execute('select current_database()')
     db_name = cur.fetchall()[0][0]
-    cur.execute('select count(*) from information_schema.tables where table_name like \'%robin_part%\' and table_catalog=\'' + db_name + '\'')
+    cur.execute('select count(*) from information_schema.tables where table_name like \'%rrobin_part%\' and table_catalog=\'' + db_name + '\'')
     partitions_count = cur.fetchall()[0][0]
 
     partition_records_dict = {}

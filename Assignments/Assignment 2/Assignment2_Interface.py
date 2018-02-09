@@ -8,7 +8,7 @@ import os
 import sys
 # Donot close the connection inside this file i.e. do not perform openconnection.close()
 def RangeQuery(ratingsTableName, ratingMinValue, ratingMaxValue, openconnection):
-    fh = open("RangeQueryOut.txt", "w")
+    data = []
 
     cur = openconnection.cursor()
     cur.execute('select current_database()')
@@ -26,7 +26,7 @@ def RangeQuery(ratingsTableName, ratingMinValue, ratingMaxValue, openconnection)
                 partition = "RangeRatingsPart" + table_name[-1]
             else:
                 partition = "RoundRobinRatingsPart" + table_name[-1]
-            fh.write(str(partition) + "," + str(match[0]) + "," + str(match[1]) + "," + str(match[2]) + "\n")
+            data.append(str(partition) + "," + str(match[0]) + "," + str(match[1]) + "," + str(match[2]))
 
     cur.execute('select table_name from information_schema.tables where table_name like \'%roundrobinratingspart%\' and table_catalog=\'' + db_name + '\'')
     round_robin_partitions = cur.fetchall()
@@ -41,14 +41,17 @@ def RangeQuery(ratingsTableName, ratingMinValue, ratingMaxValue, openconnection)
                 partition = "RangeRatingsPart" + table_name[-1]
             else:
                 partition = "RoundRobinRatingsPart" + table_name[-1]
-            fh.write(str(partition) + "," + str(match[0]) + "," + str(match[1]) + "," + str(match[2]) + "\n")
+            data.append(str(partition) + "," + str(match[0]) + "," + str(match[1]) + "," + str(match[2]))
 
     cur.close()
+
+    fh = open("RangeQueryOut.txt", "w")
+    fh.write("\n".join(data))
     fh.close()
 
 
 def PointQuery(ratingsTableName, ratingValue, openconnection):
-    fh = open("PointQueryOut.txt", "w")
+    data = []
 
     cur = openconnection.cursor()
     cur.execute('select current_database()')
@@ -66,7 +69,7 @@ def PointQuery(ratingsTableName, ratingValue, openconnection):
                 partition = "RangeRatingsPart" + table_name[-1]
             else:
                 partition = "RoundRobinRatingsPart" + table_name[-1]
-            fh.write(str(partition) + "," + str(match[0]) + "," + str(match[1]) + "," + str(match[2]) + "\n")
+            data.append(str(partition) + "," + str(match[0]) + "," + str(match[1]) + "," + str(match[2]))
 
     cur.execute(
         'select table_name from information_schema.tables where table_name like \'%roundrobinratingspart%\' and table_catalog=\'' + db_name + '\'')
@@ -81,7 +84,10 @@ def PointQuery(ratingsTableName, ratingValue, openconnection):
                 partition = "RangeRatingsPart" + table_name[-1]
             else:
                 partition = "RoundRobinRatingsPart" + table_name[-1]
-            fh.write(str(partition) + "," + str(match[0]) + "," + str(match[1]) + "," + str(match[2]) + "\n")
+            data.append(str(partition) + "," + str(match[0]) + "," + str(match[1]) + "," + str(match[2]))
 
     cur.close()
+
+    fh = open("PointQueryOut.txt", "w")
+    fh.write("\n".join(data))
     fh.close()

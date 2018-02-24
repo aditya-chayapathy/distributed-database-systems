@@ -5,6 +5,7 @@
 
 import psycopg2
 import os
+import threading
 import sys
 
 ##################### This needs to changed based on what kind of table we want to sort. ##################
@@ -17,11 +18,83 @@ JOIN_COLUMN_NAME_FIRST_TABLE = 'column1'
 JOIN_COLUMN_NAME_SECOND_TABLE = 'column2'
 ##########################################################################################################
 
+def checkAndCreateTable(InputTable, OutputTable, openconnection):
+    cur = openconnection.cursor()
+
+    cur.execute('select current_database()')
+    db_name = cur.fetchall()[0][0]
+
+    cur.execute('select table_name from information_schema.tables where table_name =  \'' + OutputTable + '\' and table_catalog=\'' + db_name + '\'')
+    res = cur.fetchall()
+    if len(res) > 0:
+        cur.close()
+        return
+
+    cur.execute('select column_name, udt_name from information_schema.columns where table_name =  \'' + InputTable + '\' and table_catalog=\'' + db_name + '\'')
+    input_schema = cur.fetchall()
+
+    column_spec = []
+    for column in input_schema:
+        (column_name, data_type) = column
+        column_spec.append(str(column_name) + " " + str(data_type))
+    create_output_table_statement = "create table " + str(OutputTable) + "(" + ",".join(column_spec) + ")"
+
+    cur.execute(create_output_table_statement)
+    cur.close()
+    openconnection.commit()
+
+
+def parallelPartitionSort(partitionNumber, inputTable, start, end, sortingColumnName, openconnection):
+    table_name = "ParallelSortPartition" + str(partitionNumber)
+    checkAndCreateTable(inputTable, table_name, openconnection)
+
+    cur = openconnection.cursor()
+    if partitionNumber != 5:
+        cur.execute('select * from ' + inputTable + ' where ' + sortingColumnName + " >= " + start + " and " + sortingColumnName + " < " + end + " order by " + sortingColumnName + " asc")
+    else:
+        cur.execute('select * from ' + inputTable + ' where ' + sortingColumnName + " >= " + start + " and " + sortingColumnName + " <= " + end + " order by " + sortingColumnName + " asc")
+    res = cur.fetchall()
+    for record in res:
+        cur.execute("insert into " + str(table_name) + " values %s", (record,))
+
+    cur.close()
+    openconnection.commit()
+
 
 # Donot close the connection inside this file i.e. do not perform openconnection.close()
 def ParallelSort (InputTable, SortingColumnName, OutputTable, openconnection):
-    #Implement ParallelSort Here.
-    pass #Remove this once you are done with implementation
+    checkAndCreateTable(InputTable, OutputTable, openconnection)
+
+    cur = openconnection.cursor()
+    cur.execute('select min(' + SortingColumnName + '), max(' + SortingColumnName + ') from ' + InputTable)
+    range_res = cur.fetchall()
+    min_val = range_res[0][0]
+    max_val = range_res[0][1]
+    interval = (max_val - min_val) / float(5)
+
+    threads = []
+    start = min_val
+    end = start + interval
+    for i in range(5):
+        t = threading.Thread(target=parallelPartitionSort, args=(i, InputTable, start, end, SortingColumnName, openconnection))
+        threads.append(t)
+        t.start()
+        start = end
+        end += interval
+
+    for thread in threads:
+        thread.join()
+
+    for i in range(5):
+        cur.execute('select * from ParallelSortPartition' + str(i) + ' order by ' + SortingColumnName + ' asc')
+        partition_res = cur.fetchall()
+        for record in partition_res:
+            cur.execute("insert into " + str(OutputTable) + " values %s", (record,))
+        cur.execute("drop table ParallelSortPartition" + str(i))
+
+    cur.close()
+    openconnection.commit()
+
 
 def ParallelJoin (InputTable1, InputTable2, Table1JoinColumn, Table2JoinColumn, OutputTable, openconnection):
     #Implement ParallelJoin Here.

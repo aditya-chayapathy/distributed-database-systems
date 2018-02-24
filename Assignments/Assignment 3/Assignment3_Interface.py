@@ -49,10 +49,10 @@ def parallelPartitionSort(partitionNumber, inputTable, start, end, sortingColumn
     checkAndCreateTable(inputTable, table_name, openconnection)
 
     cur = openconnection.cursor()
-    if partitionNumber != 5:
-        cur.execute('select * from ' + inputTable + ' where ' + sortingColumnName + " >= " + start + " and " + sortingColumnName + " < " + end + " order by " + sortingColumnName + " asc")
+    if partitionNumber != 4:
+        cur.execute('select * from ' + inputTable + ' where ' + sortingColumnName + " >= " + str(start) + " and " + sortingColumnName + " < " + str(end) + " order by " + sortingColumnName + " asc")
     else:
-        cur.execute('select * from ' + inputTable + ' where ' + sortingColumnName + " >= " + start + " and " + sortingColumnName + " <= " + end + " order by " + sortingColumnName + " asc")
+        cur.execute('select * from ' + inputTable + ' where ' + sortingColumnName + " >= " + str(start) + " and " + sortingColumnName + " <= " + str(end) + " order by " + sortingColumnName + " asc")
     res = cur.fetchall()
     for record in res:
         cur.execute("insert into " + str(table_name) + " values %s", (record,))
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     	# Creating Database ddsassignment3
     	print "Creating Database named as ddsassignment3"
     	createDB();
-    	
+
     	# Getting connection to the database
     	print "Getting connection from the ddsassignment3 database"
     	con = getOpenConnection();
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     	# Calling ParallelJoin
     	print "Performing Parallel Join"
     	ParallelJoin(FIRST_TABLE_NAME, SECOND_TABLE_NAME, JOIN_COLUMN_NAME_FIRST_TABLE, JOIN_COLUMN_NAME_SECOND_TABLE, 'parallelJoinOutputTable', con);
-    	
+
     	# Saving parallelSortOutputTable and parallelJoinOutputTable on two files
     	saveTable('parallelSortOutputTable', 'parallelSortOutputTable.txt', con);
     	saveTable('parallelJoinOutputTable', 'parallelJoinOutputTable.txt', con);

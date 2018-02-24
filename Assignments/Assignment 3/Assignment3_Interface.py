@@ -18,6 +18,7 @@ JOIN_COLUMN_NAME_FIRST_TABLE = 'column1'
 JOIN_COLUMN_NAME_SECOND_TABLE = 'column2'
 ##########################################################################################################
 
+
 def checkAndCreateTable(InputTable, OutputTable, openconnection):
     cur = openconnection.cursor()
 
@@ -44,6 +45,37 @@ def checkAndCreateTable(InputTable, OutputTable, openconnection):
     openconnection.commit()
 
 
+def checkAndCreateJoinTable(InputTable1, InputTable2, Table1JoinColumn, Table2JoinColumn, OutputTable, openconnection):
+    cur = openconnection.cursor()
+
+    cur.execute('select current_database()')
+    db_name = cur.fetchall()[0][0]
+
+    cur.execute('select table_name from information_schema.tables where table_name =  \'' + OutputTable + '\' and table_catalog=\'' + db_name + '\'')
+    res = cur.fetchall()
+    if len(res) > 0:
+        cur.close()
+        return
+
+    column_spec = []
+    cur.execute('select column_name, udt_name from information_schema.columns where table_name =  \'' + InputTable1 + '\' and table_catalog=\'' + db_name + '\'')
+    input_schema = cur.fetchall()
+    for column in input_schema:
+        (column_name, data_type) = column
+        column_spec.append(str(column_name) + " " + str(data_type))
+    cur.execute('select column_name, udt_name from information_schema.columns where table_name =  \'' + InputTable2 + '\' and table_catalog=\'' + db_name + '\'')
+    input_schema = cur.fetchall()
+    for column in input_schema:
+        (column_name, data_type) = column
+        if Table2JoinColumn != Table1JoinColumn:
+            column_spec.append(str(column_name) + " " + str(data_type))
+    create_output_table_statement = "create table " + str(OutputTable) + "(" + ",".join(column_spec) + ")"
+
+    cur.execute(create_output_table_statement)
+    cur.close()
+    openconnection.commit()
+
+
 def parallelPartitionSort(partitionNumber, inputTable, start, end, sortingColumnName, openconnection):
     table_name = "ParallelSortPartition" + str(partitionNumber)
     checkAndCreateTable(inputTable, table_name, openconnection)
@@ -57,6 +89,33 @@ def parallelPartitionSort(partitionNumber, inputTable, start, end, sortingColumn
     for record in res:
         cur.execute("insert into " + str(table_name) + " values %s", (record,))
 
+    cur.close()
+    openconnection.commit()
+
+
+def parallelPartitionJoin(partitionNumber, InputTable1, InputTable2, Table1JoinColumn, Table2JoinColumn, start, end, OutputTable, openconnection):
+    table1_name = "ParallelJoinPartition" + str(partitionNumber) + InputTable1
+    checkAndCreateTable(InputTable1, table1_name, openconnection)
+    table2_name = "ParallelJoinPartition" + str(partitionNumber) + InputTable2
+    checkAndCreateTable(InputTable2, table2_name, openconnection)
+
+    cur = openconnection.cursor()
+    if partitionNumber != 4:
+        cur.execute('select * from ' + InputTable1 + ' where ' + Table1JoinColumn + " >= " + str(start) + " and " + Table1JoinColumn + " < " + str(end) + " order by " + Table1JoinColumn + " asc")
+    else:
+        cur.execute('select * from ' + InputTable1 + ' where ' + Table1JoinColumn + " >= " + str(start) + " and " + Table1JoinColumn + " <= " + str(end) + " order by " + Table1JoinColumn + " asc")
+    res = cur.fetchall()
+    for record in res:
+        cur.execute("insert into " + str(table1_name) + " values %s", (record,))
+    if partitionNumber != 4:
+        cur.execute('select * from ' + InputTable2 + ' where ' + Table2JoinColumn + " >= " + str(start) + " and " + Table2JoinColumn + " < " + str(end) + " order by " + Table2JoinColumn + " asc")
+    else:
+        cur.execute('select * from ' + InputTable2 + ' where ' + Table2JoinColumn + " >= " + str(start) + " and " + Table2JoinColumn + " <= " + str(end) + " order by " + Table2JoinColumn + " asc")
+    res = cur.fetchall()
+    for record in res:
+        cur.execute("insert into " + str(table2_name) + " values %s", (record,))
+
+    cur.execute('insert into ' + OutputTable + ' select * from ' + table1_name + ' inner join ' + table2_name + ' on ' + table1_name + '.' + Table1JoinColumn + ' = ' + table2_name + '.' + Table2JoinColumn)
     cur.close()
     openconnection.commit()
 
@@ -97,8 +156,36 @@ def ParallelSort (InputTable, SortingColumnName, OutputTable, openconnection):
 
 
 def ParallelJoin (InputTable1, InputTable2, Table1JoinColumn, Table2JoinColumn, OutputTable, openconnection):
-    #Implement ParallelJoin Here.
-    pass # Remove this once you are done with implementation
+    checkAndCreateJoinTable(InputTable1, InputTable2, Table1JoinColumn, Table2JoinColumn, OutputTable, openconnection)
+
+    cur = openconnection.cursor()
+    cur.execute('select min(' + Table1JoinColumn + '), max(' + Table1JoinColumn + ') from ' + InputTable1)
+    range_res = cur.fetchall()
+    min_val_table1 = range_res[0][0]
+    max_val_table1 = range_res[0][1]
+    cur.execute('select min(' + Table2JoinColumn + '), max(' + Table2JoinColumn + ') from ' + InputTable2)
+    range_res = cur.fetchall()
+    min_val_table2 = range_res[0][0]
+    max_val_table2 = range_res[0][1]
+    min_val = min(min_val_table1, min_val_table2)
+    max_val = max(max_val_table1, max_val_table2)
+    interval = (max_val - min_val) / float(5)
+
+    threads = []
+    start = min_val
+    end = start + interval
+    for i in range(5):
+        t = threading.Thread(target=parallelPartitionJoin,args=(i, InputTable1, InputTable2, Table1JoinColumn, Table2JoinColumn, start, end, OutputTable, openconnection))
+        threads.append(t)
+        t.start()
+        start = end
+        end += interval
+
+    for thread in threads:
+        thread.join()
+
+    cur.close()
+    openconnection.commit()
 
 
 ################### DO NOT CHANGE ANYTHING BELOW THIS #############################

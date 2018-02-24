@@ -31,16 +31,7 @@ def checkAndCreateTable(InputTable, OutputTable, openconnection):
         cur.close()
         return
 
-    cur.execute('select column_name, udt_name from information_schema.columns where table_name =  \'' + InputTable + '\' and table_catalog=\'' + db_name + '\'')
-    input_schema = cur.fetchall()
-
-    column_spec = []
-    for column in input_schema:
-        (column_name, data_type) = column
-        column_spec.append(str(column_name) + " " + str(data_type))
-    create_output_table_statement = "create table " + str(OutputTable) + "(" + ",".join(column_spec) + ")"
-
-    cur.execute(create_output_table_statement)
+    cur.execute('create table ' + OutputTable + ' as select * from ' + InputTable + ' limit 0')
     cur.close()
     openconnection.commit()
 
@@ -57,21 +48,7 @@ def checkAndCreateJoinTable(InputTable1, InputTable2, Table1JoinColumn, Table2Jo
         cur.close()
         return
 
-    column_spec = []
-    cur.execute('select column_name, udt_name from information_schema.columns where table_name =  \'' + InputTable1 + '\' and table_catalog=\'' + db_name + '\'')
-    input_schema = cur.fetchall()
-    for column in input_schema:
-        (column_name, data_type) = column
-        column_spec.append(str(column_name) + " " + str(data_type))
-    cur.execute('select column_name, udt_name from information_schema.columns where table_name =  \'' + InputTable2 + '\' and table_catalog=\'' + db_name + '\'')
-    input_schema = cur.fetchall()
-    for column in input_schema:
-        (column_name, data_type) = column
-        if Table2JoinColumn != Table1JoinColumn:
-            column_spec.append(str(column_name) + " " + str(data_type))
-    create_output_table_statement = "create table " + str(OutputTable) + "(" + ",".join(column_spec) + ")"
-
-    cur.execute(create_output_table_statement)
+    cur.execute('create table ' + OutputTable + ' as select * from ' + InputTable1 + ' inner join ' + InputTable2 + ' on ' + InputTable1 + '.' + Table1JoinColumn + '=' + InputTable2 + '.' + Table2JoinColumn + ' limit 0')
     cur.close()
     openconnection.commit()
 
@@ -184,6 +161,10 @@ def ParallelJoin (InputTable1, InputTable2, Table1JoinColumn, Table2JoinColumn, 
     for thread in threads:
         thread.join()
 
+    for i in range(5):
+        cur.execute('drop table ' + 'ParallelJoinPartition' + str(i) + InputTable1)
+        cur.execute('drop table ' + 'ParallelJoinPartition' + str(i) + InputTable2)
+
     cur.close()
     openconnection.commit()
 
@@ -289,7 +270,7 @@ if __name__ == '__main__':
     	# Calling ParallelJoin
     	print "Performing Parallel Join"
     	ParallelJoin(FIRST_TABLE_NAME, SECOND_TABLE_NAME, JOIN_COLUMN_NAME_FIRST_TABLE, JOIN_COLUMN_NAME_SECOND_TABLE, 'parallelJoinOutputTable', con);
-
+        exit(1)
     	# Saving parallelSortOutputTable and parallelJoinOutputTable on two files
     	saveTable('parallelSortOutputTable', 'parallelSortOutputTable.txt', con);
     	saveTable('parallelJoinOutputTable', 'parallelJoinOutputTable.txt', con);

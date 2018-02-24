@@ -270,7 +270,7 @@ if __name__ == '__main__':
     	# Calling ParallelJoin
     	print "Performing Parallel Join"
     	ParallelJoin(FIRST_TABLE_NAME, SECOND_TABLE_NAME, JOIN_COLUMN_NAME_FIRST_TABLE, JOIN_COLUMN_NAME_SECOND_TABLE, 'parallelJoinOutputTable', con);
-        exit(1)
+        
     	# Saving parallelSortOutputTable and parallelJoinOutputTable on two files
     	saveTable('parallelSortOutputTable', 'parallelSortOutputTable.txt', con);
     	saveTable('parallelJoinOutputTable', 'parallelJoinOutputTable.txt', con);

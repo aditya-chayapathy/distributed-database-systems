@@ -89,9 +89,9 @@ public class Equijoin {
                     StringBuilder outputValue = new StringBuilder();
                     for (int i = 0; i < table1Lines.size(); i++) {
                         for (int j = 0; j < table2Lines.size(); j++) {
-                            outputValue.append(table1Lines.get(j));
+                            outputValue.append(table2Lines.get(j));
                             outputValue.append(", ");
-                            outputValue.append(table2Lines.get(i));
+                            outputValue.append(table1Lines.get(i));
                         }
                     }
                     con.write(null, new Text(outputValue.toString()));

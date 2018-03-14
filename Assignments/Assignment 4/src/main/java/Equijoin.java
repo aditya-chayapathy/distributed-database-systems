@@ -60,19 +60,7 @@ public class Equijoin {
             }
 
             if (lines.size() > 1) {
-                String table1 = "";
-                String table2 = "";
-                for (int i = 0; i < lines.size(); i++) {
-                    String tableName = lines.get(i).split(", ")[0];
-                    if (i == 0) {
-                        table1 = tableName;
-                        continue;
-                    }
-                    if (tableName.equals(table1)) {
-                        table2 = tableName;
-                        break;
-                    }
-                }
+                String table1 = lines.get(0).split(", ")[0];
 
                 List<String> table1Lines = new ArrayList<String>();
                 List<String> table2Lines = new ArrayList<String>();
@@ -92,9 +80,10 @@ public class Equijoin {
                             outputValue.append(table2Lines.get(j));
                             outputValue.append(", ");
                             outputValue.append(table1Lines.get(i));
+                            outputValue.append("\n");
                         }
                     }
-                    con.write(null, new Text(outputValue.toString()));
+                    con.write(null, new Text(outputValue.toString().trim()));
                 }
             }
         }

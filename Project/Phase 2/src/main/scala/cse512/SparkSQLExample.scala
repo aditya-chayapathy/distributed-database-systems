@@ -1,8 +1,7 @@
 package cse512
 
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.SparkSession
-
+import org.apache.spark.sql.{SaveMode, SparkSession}
 
 object SparkSQLExample {
 
@@ -15,72 +14,77 @@ object SparkSQLExample {
     val spark = SparkSession
       .builder()
       .appName("CSE512-Phase2")
-      .config("spark.some.config.option", "some-value").master(args(0))
+      .config("spark.some.config.option", "some-value")//.master("local[*]")
       .getOrCreate()
 
-
-    runRangeQuery(spark,args)
-    runRangeJoinQuery(spark,args)
-    runDistanceQuery(spark,args)
-    runDistanceJoinQuery(spark,args)
+    paramsParser(spark, args)
 
     spark.stop()
   }
 
-  private def runRangeQuery(spark: SparkSession,args: Array[String]): Unit = {
+  private def paramsParser(spark: SparkSession, args: Array[String]): Unit =
+  {
+    var paramOffset = 1
+    var currentQueryParams = ""
+    var currentQueryName = ""
+    var currentQueryIdx = -1
 
-    val arealmDf = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(args(1));
-    arealmDf.createOrReplaceTempView("point")
+    while (paramOffset <= args.length)
+    {
+        if (paramOffset == args.length || args(paramOffset).toLowerCase.contains("query"))
+        {
+          // Turn in the previous query
+          if (currentQueryIdx!= -1) queryLoader(spark, currentQueryName, currentQueryParams, args(0)+currentQueryIdx)
 
-    // YOU NEED TO FILL IN THIS USER DEFINED FUNCTION
-    spark.udf.register("ST_Contains",(queryRectangle:String, pointString:String)=>((true)))
+          // Start a new query call
+          if (paramOffset == args.length) return
 
-    val resultDf = spark.sql("select * from point where ST_Contains(point._c0,'-155.940114,19.081331,-155.618917,19.5307')")
-    resultDf.show()
-    //print(resultDf.count())
+          currentQueryName = args(paramOffset)
+          currentQueryParams = ""
+          currentQueryIdx = currentQueryIdx+1
+        }
+        else
+        {
+          // Keep appending query parameters
+          currentQueryParams = currentQueryParams + args(paramOffset) +" "
+        }
+
+      paramOffset = paramOffset+1
+    }
   }
 
-  private def runRangeJoinQuery(spark: SparkSession,args: Array[String]): Unit = {
+  private def queryLoader(spark: SparkSession, queryName:String, queryParams:String, outputPath: String): Unit =
+  {
+    var queryResult:Long = -1
+    val queryParam = queryParams.split(" ")
+    if (queryName.equalsIgnoreCase("RangeQuery"))
+    {
+      if(queryParam.length!=2) throw new ArrayIndexOutOfBoundsException("[CSE512] Query "+queryName+" needs 2 parameters but you entered "+queryParam.length)
+      queryResult = SpatialQuery.runRangeQuery(spark, queryParam(0), queryParam(1))
+    }
+    else if (queryName.equalsIgnoreCase("RangeJoinQuery"))
+    {
+      if(queryParam.length!=2) throw new ArrayIndexOutOfBoundsException("[CSE512] Query "+queryName+" needs 2 parameters but you entered "+queryParam.length)
+      queryResult = SpatialQuery.runRangeJoinQuery(spark, queryParam(0), queryParam(1))
+    }
+    else if (queryName.equalsIgnoreCase("DistanceQuery"))
+    {
+      if(queryParam.length!=3) throw new ArrayIndexOutOfBoundsException("[CSE512] Query "+queryName+" needs 3 parameters but you entered "+queryParam.length)
+      queryResult = SpatialQuery.runDistanceQuery(spark, queryParam(0), queryParam(1), queryParam(2))
+    }
+    else if (queryName.equalsIgnoreCase("DistanceJoinQuery"))
+    {
+      if(queryParam.length!=3) throw new ArrayIndexOutOfBoundsException("[CSE512] Query "+queryName+" needs 3 parameters but you entered "+queryParam.length)
+      queryResult = SpatialQuery.runDistanceJoinQuery(spark, queryParam(0), queryParam(1), queryParam(2))
+    }
+    else
+    {
+        throw new NoSuchElementException("[CSE512] The given query name "+queryName+" is wrong. Please check your input.")
+    }
 
-    val arealmDf = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(args(1));
-    arealmDf.createOrReplaceTempView("point")
-
-    val zcta510Df = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(args(2));
-    zcta510Df.createOrReplaceTempView("rectangle")
-
-    // YOU NEED TO FILL IN THIS USER DEFINED FUNCTION
-    spark.udf.register("ST_Contains",(rectanlgeString:String, pointString:String)=>((true)))
-
-    val resultDf = spark.sql("select * from rectangle,point where ST_Contains(rectangle._c0,point._c0)")
-    resultDf.show()
-    //print(resultDf.count())
+    import spark.implicits._
+    val resultDf = Seq(queryName, queryResult.toString).toDF()
+    resultDf.write.mode(SaveMode.Overwrite).csv(outputPath)
   }
 
-  private def runDistanceQuery(spark: SparkSession,args: Array[String]): Unit = {
-
-    val arealmDf = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(args(1));
-    arealmDf.createOrReplaceTempView("point")
-
-    // YOU NEED TO FILL IN THIS USER DEFINED FUNCTION
-    spark.udf.register("ST_Within",(pointString1:String, pointString2:String, distance:Double)=>((true)))
-
-    val resultDf = spark.sql("select * from point where ST_Within(point._c0,'-88.331492,32.324142',10)")
-    resultDf.show()
-    //print(resultDf.count())
-  }
-
-
-
-  private def runDistanceJoinQuery(spark: SparkSession,args: Array[String]): Unit = {
-
-    val arealmDf = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(args(1));
-    arealmDf.createOrReplaceTempView("point")
-
-    // YOU NEED TO FILL IN THIS USER DEFINED FUNCTION
-    spark.udf.register("ST_Within",(pointString1:String, pointString2:String, distance:Double)=>((true)))
-    val resultDf = spark.sql("select * from point p1, point p2 where ST_Within(p1._c0, p2._c0, 10)")
-
-    resultDf.show()
-    //print(resultDf.count())
-  }
 }

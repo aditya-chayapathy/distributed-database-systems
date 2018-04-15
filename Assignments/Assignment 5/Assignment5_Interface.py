@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import math
+import re
 
 
 def get_distance_between_points(point2_lat, point2_long, point1_lat, point1_long):
@@ -25,7 +26,7 @@ def get_distance_between_points(point2_lat, point2_long, point1_lat, point1_long
 
 
 def FindBusinessBasedOnCity(cityToSearch, saveLocation1, collection):
-    result = collection.find({"city": cityToSearch})
+    result = collection.find({"city": re.compile(cityToSearch, re.IGNORECASE)})
     data = []
     for rec in result:
         data.append(rec["name"] + "$" + rec["full_address"] + "$" + rec["city"] + "$" + rec["state"])

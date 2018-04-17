@@ -1,1 +1,0 @@
-test/output hotzoneanalysis src/resources/point-hotzone.csv src/resources/zone-hotzone.csv

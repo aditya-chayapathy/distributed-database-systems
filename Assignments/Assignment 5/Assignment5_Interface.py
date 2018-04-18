@@ -32,7 +32,7 @@ def FindBusinessBasedOnCity(cityToSearch, saveLocation1, collection):
         data.append(rec["name"] + "$" + rec["full_address"] + "$" + rec["city"] + "$" + rec["state"])
 
     fh = open(saveLocation1, "w")
-    fh.write("\n".join(data))
+    fh.write("\n".join(data).upper())
     fh.close()
 
 
@@ -45,6 +45,6 @@ def FindBusinessBasedOnLocation(categoriesToSearch, myLocation, maxDistance, sav
             data.append(rec["name"])
 
     fh = open(saveLocation2, "w")
-    fh.write("\n".join(data))
+    fh.write("\n".join(data).upper())
     fh.close()
 
